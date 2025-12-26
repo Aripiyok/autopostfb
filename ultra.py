@@ -18,13 +18,16 @@ TG_API_HASH = os.getenv("TG_API_HASH")
 TG_CHANNEL = int(os.getenv("TG_CHANNEL"))
 
 # ===============================
-# FACEBOOK
+# FACEBOOK (PAGE ONLY)
 # ===============================
 FB_PAGE_ID = os.getenv("FB_PAGE_ID")
 FB_PAGE_TOKEN = os.getenv("FB_PAGE_TOKEN")
 
+if not FB_PAGE_ID or not FB_PAGE_TOKEN:
+    raise RuntimeError("❌ FB_PAGE_ID / FB_PAGE_TOKEN belum diset di .env")
+
 # ===============================
-# PATH SETUP (ABSOLUTE – FIX SQLITE)
+# PATH SETUP
 # ===============================
 BASE_DIR = "/root/autopostfb"
 SESSION_DIR = os.path.join(BASE_DIR, "session")
@@ -52,6 +55,26 @@ def load_caption():
 client = TelegramClient(SESSION_PATH, TG_API_ID, TG_API_HASH)
 
 # ===============================
+# FACEBOOK UPLOAD (PAGE SAFE)
+# ===============================
+def upload_to_facebook(image_path, caption):
+    url = f"https://graph.facebook.com/v24.0/{FB_PAGE_ID}/photos"
+
+    with open(image_path, "rb") as img:
+        r = requests.post(
+            url,
+            files={"source": img},
+            data={
+                "caption": caption,
+                "access_token": FB_PAGE_TOKEN
+            },
+            timeout=60
+        )
+
+    print("📤 FB RESPONSE:", r.text)
+    return r.ok
+
+# ===============================
 # MAIN LOGIC
 # ===============================
 async def run():
@@ -63,63 +86,30 @@ async def run():
 
     posted = False
 
-    async for msg in client.iter_messages(TG_CHANNEL, limit=10):
+    async for msg in client.iter_messages(TG_CHANNEL, limit=20):
         print(f"🔍 DEBUG MSG ID {msg.id} | media={type(msg.media)}")
 
         # ===============================
-        # FOTO TUNGGAL
+        # FOTO (SINGLE / ALBUM)
         # ===============================
-        if msg.media and isinstance(msg.media, MessageMediaPhoto):
-            print("📸 FOTO TUNGGAL DITEMUKAN")
+        if isinstance(msg.media, MessageMediaPhoto):
+            print("📸 FOTO DITEMUKAN")
 
             img_path = await msg.download_media(file=IMG_DIR)
             print("⬇️ Downloaded:", img_path)
 
-            url = f"https://graph.facebook.com/v19.0/{FB_PAGE_ID}/photos"
-            with open(img_path, "rb") as f:
-                r = requests.post(
-                    url,
-                    data={
-                        "caption": caption,
-                        "access_token": FB_PAGE_TOKEN
-                    },
-                    files={"source": f},
-                    timeout=30
-                )
+            success = upload_to_facebook(img_path, caption)
 
-            print("📤 FB RESPONSE:", r.text)
             os.remove(img_path)
-            posted = True
-            break
 
-        # ===============================
-        # FOTO DARI ALBUM
-        # ===============================
-        if msg.grouped_id and msg.photo:
-            print("📸 FOTO ALBUM DITEMUKAN")
-
-            img_path = await msg.download_media(file=IMG_DIR)
-            print("⬇️ Downloaded:", img_path)
-
-            url = f"https://graph.facebook.com/v19.0/{FB_PAGE_ID}/photos"
-            with open(img_path, "rb") as f:
-                r = requests.post(
-                    url,
-                    data={
-                        "caption": caption,
-                        "access_token": FB_PAGE_TOKEN
-                    },
-                    files={"source": f},
-                    timeout=30
-                )
-
-            print("📤 FB RESPONSE:", r.text)
-            os.remove(img_path)
-            posted = True
-            break
+            if success:
+                posted = True
+                break
+            else:
+                print("⚠️ Upload gagal, lanjut ke pesan berikutnya")
 
     if not posted:
-        print("⚠️ TIDAK ADA FOTO YANG BISA DIPOST")
+        print("⚠️ TIDAK ADA FOTO YANG BERHASIL DIPOST")
 
     await client.disconnect()
     print("🔌 Telegram disconnected")
