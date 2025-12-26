@@ -5,25 +5,44 @@ from telethon.tl.types import MessageMediaPhoto
 
 load_dotenv()
 
+# ===============================
 # TELEGRAM
+# ===============================
 TG_API_ID = int(os.getenv("TG_API_ID"))
 TG_API_HASH = os.getenv("TG_API_HASH")
-TG_CHANNEL = os.getenv("TG_CHANNEL")
+TG_CHANNEL = int(os.getenv("TG_CHANNEL"))
 
+# ===============================
 # FACEBOOK
+# ===============================
 FB_PAGE_ID = os.getenv("FB_PAGE_ID")
 FB_PAGE_TOKEN = os.getenv("FB_PAGE_TOKEN")
 
-IMG_DIR = "images"
-CAPTION_FILE = "caption.txt"
+# ===============================
+# PATH SETUP (FIX SQLITE)
+# ===============================
+BASE_DIR = "/root/autopostfb"
+SESSION_DIR = os.path.join(BASE_DIR, "session")
+IMG_DIR = os.path.join(BASE_DIR, "images")
+CAPTION_FILE = os.path.join(BASE_DIR, "caption.txt")
 
+os.makedirs(SESSION_DIR, exist_ok=True)
 os.makedirs(IMG_DIR, exist_ok=True)
 
+SESSION_PATH = os.path.join(SESSION_DIR, "ultra")
+
+# ===============================
+# LOAD CAPTION
+# ===============================
 def load_caption():
     with open(CAPTION_FILE, "r", encoding="utf-8") as f:
-        return random.choice([x.strip() for x in f if x.strip()])
+        captions = [x.strip() for x in f if x.strip()]
+    return random.choice(captions) if captions else ""
 
-client = TelegramClient("session/ultra", TG_API_ID, TG_API_HASH)
+# ===============================
+# TELETHON CLIENT (ABSOLUTE PATH)
+# ===============================
+client = TelegramClient(SESSION_PATH, TG_API_ID, TG_API_HASH)
 
 async def run():
     await client.start()
