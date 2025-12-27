@@ -96,16 +96,15 @@ def post_fb_comment(post_id, text):
     print("💬 FB COMMENT RESPONSE:", r.text)
 
 # ===============================
-# MAIN LOGIC
+# MAIN LOGIC (1x CHECK)
 # ===============================
-async def run():
+async def run_once():
     now = int(time.time())
     last_post_time = load_last_post_time()
 
-    # ⏳ CHECK DELAY
     if now - last_post_time < POST_DELAY_SECONDS:
         wait = POST_DELAY_SECONDS - (now - last_post_time)
-        print(f"⏳ Belum waktunya posting. Tunggu {wait // 60} menit lagi.")
+        print(f"⏳ Belum waktunya posting. Sisa {wait // 60} menit")
         return
 
     client = TelegramClient(SESSION_PATH, TG_API_ID, TG_API_HASH)
@@ -124,14 +123,10 @@ async def run():
         if isinstance(msg.media, MessageMediaPhoto):
             print(f"📸 Proses MSG ID {msg.id}")
 
-            # Ambil text Telegram (caption + link)
             tg_text = (msg.text or msg.message or "").strip()
-
-            # Download foto
             img_path = await msg.download_media(file=IMG_DIR)
             print("⬇️ Downloaded:", img_path)
 
-            # Upload foto ke FB (caption aman)
             r = upload_photo_to_fb(img_path, safe_caption)
             os.remove(img_path)
 
@@ -139,21 +134,26 @@ async def run():
                 data = r.json()
                 post_id = data.get("post_id")
 
-                # Post komentar (isi caption + link Telegram)
                 if post_id and tg_text:
                     post_fb_comment(post_id, tg_text)
 
                 save_last_id(msg.id)
                 save_last_post_time(int(time.time()))
-                print("✅ POST BERHASIL, MENUNGGU DELAY BERIKUTNYA")
+                print("✅ POST BERHASIL")
                 break
-            else:
-                print("⚠️ Upload gagal, lanjut ke pesan berikutnya")
 
     await client.disconnect()
     print("🔌 Telegram disconnected")
 
 # ===============================
-# RUN
+# LOOP 24 JAM
 # ===============================
-asyncio.run(run())
+print("🚀 BOT AUTOPOST 24 JAM AKTIF")
+
+while True:
+    try:
+        asyncio.run(run_once())
+    except Exception as e:
+        print("❌ ERROR:", e)
+
+    time.sleep(60)  # cek setiap 1 menit
